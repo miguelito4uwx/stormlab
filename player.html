@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>StormLab — PLAYER</title>
+  <title>StormLab    PLAYER</title>
 
   <!--
   ══════════════════════════════════════════════════════════════
-  STORMLAB SCIENCE SHOWDOWN — player.html
+  STORMLAB SCIENCE SHOWDOWN
   ══════════════════════════════════════════════════════════════
   Students open this page on their own device.
   1. Make sure you're on the same WiFi as the teacher/host
@@ -166,7 +166,7 @@
         <div style="text-align:right">
           <div class="label">Rank</div>
           <div id="player-rank-display"
-            style="font-family:var(--font-display);font-size:2rem;color:var(--accent-yellow)">—</div>
+            style="font-family:var(--font-display);font-size:2rem;color:var(--accent-yellow)">  </div>
         </div>
       </div>
 
@@ -257,7 +257,7 @@
         <div class="score-counter" id="final-score">0</div>
         <div class="label mt-8">Accuracy</div>
         <div id="final-accuracy"
-          style="font-family:var(--font-display);font-size:1.8rem;color:var(--success)">—%</div>
+          style="font-family:var(--font-display);font-size:1.8rem;color:var(--success)">  %</div>
         <div id="final-title" style="font-family:var(--font-ui);font-size:0.95rem;color:var(--text-muted);margin-top:8px"></div>
       </div>
 
@@ -527,7 +527,7 @@ const PlayerGame = (() => {
           myRank===1?'🥇':myRank===2?'🥈':myRank===3?'🥉':'🌪️';
 
         document.getElementById('player-result-msg').textContent =
-          myRank <= 3 ? `Top ${myRank} — Keep it up!` : 'Keep going!';
+          myRank <= 3 ? `Top ${myRank}    Keep it up!` : 'Keep going!';
 
         document.getElementById('player-result-score').textContent = formatNumber(myScore);
 
