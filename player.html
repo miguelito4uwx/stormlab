@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>StormLab PLAYER</title>
+
+  <!--
+  ======================================================
+  STORMLAB SCIENCE SHOWDOWN - Player Page
+  ======================================================
+  1. Make sure you're on the same WiFi as the teacher/host
+     (or on a shared network if using GitHub Pages)
+  2. Open this URL in your browser
+  3. Type the Game PIN shown on the big screen
+  4. Enter your name and start playing!
+  ======================================================
+  -->
+
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <script src="script.js" defer></script>
+
+  <style>
+    #join-form { max-width:420px; margin:0 auto; width:100%; }
+
+    .score-bump { animation:scoreBump 0.5s cubic-bezier(0.22,1,0.36,1); }
+    @keyframes scoreBump {
+      0%  { transform:scale(1); }
+      40% { transform:scale(1.5) rotate(-4deg); }
+      100%{ transform:scale(1); }
+    }
+
+    @media (max-width:500px) {
+      .answer-btn { min-height:76px; font-size:1.05rem; }
+      #avatar-grid { grid-template-columns:repeat(6,1fr) !important; }
+    }
+
+    .avatar-btn {
+      font-size:1.6rem;
+      background:var(--bg-card2);
+      border:2px solid transparent;
+      border-radius:10px;
+      padding:6px 2px;
+      cursor:pointer;
+      transition:all 0.15s;
+      line-height:1;
+      text-align:center;
+    }
+    .avatar-btn:hover { transform:scale(1.15); border-color:rgba(0,212,255,0.4); }
+    .avatar-btn.selected { border-color:var(--primary); background:rgba(0,212,255,0.15); transform:scale(1.2); box-shadow:0 0 12px rgba(0,212,255,0.4); }
+
+    /* Transition screen on player side */
+    #pscreen-transition {
+      background: linear-gradient(135deg, #0a0e1a 0%, #0d1f35 50%, #091a10 100%);
+    }
+    .player-transition-countdown {
+      font-family: var(--font-display);
+      font-size: clamp(5rem, 20vw, 10rem);
+      color: var(--primary);
+      text-shadow: 0 0 80px rgba(0,212,255,0.7);
+      animation: countPulse 1s ease-in-out infinite;
+      line-height: 1;
+    }
+    @keyframes countPulse {
+      0%,100% { transform: scale(1); opacity: 1; }
+      50%      { transform: scale(1.08); opacity: 0.85; }
+    }
+    .player-transition-label {
+      font-family: var(--font-ui);
+      font-size: 1.1rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .player-transition-qtext {
+      font-family: var(--font-ui);
+      font-size: clamp(1.1rem, 4vw, 1.6rem);
+      font-weight: 700;
+      color: var(--text-bright);
+      text-align: center;
+      max-width: 480px;
+      line-height: 1.35;
+      padding: 0 16px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="storm-bg"></div>
+<div class="lightning-container"></div>
+<div class="rain-container"></div>
+<button class="dark-toggle" id="dark-toggle-btn">Night mode</button>
+
+<!-- Modal -->
+<div class="modal-overlay hidden" id="player-modal">
+  <div class="modal-box">
+    <div id="pm-icon" style="font-size:3rem;margin-bottom:12px">No</div>
+    <div id="pm-title" class="section-title" style="font-size:1.4rem;margin-bottom:12px;color:var(--danger)">Name Not Allowed</div>
+    <div id="pm-body" style="color:var(--text-muted);font-family:var(--font-body);line-height:1.6;margin-bottom:20px">Please choose an appropriate name.</div>
+    <button class="btn btn-primary" onclick="closePlayerModal()">Try Again</button>
+  </div>
+</div>
+
+<div id="app">
+
+  <!-- SCREEN: JOIN -->
+  <div class="screen active" id="pscreen-join">
+    <div class="flex-col gap-24 w-full" style="align-items:center">
+
+      <div class="text-center">
+        <div class="intro-logo" style="font-size:clamp(2.8rem,12vw,5rem)">StormLab</div>
+        <div class="intro-subtitle">Science Showdown</div>
+      </div>
+
+      <div class="card" id="join-form">
+
+        <!-- Step 1: PIN -->
+        <div id="step-pin">
+          <div class="section-title text-center mb-16" style="font-size:1.6rem">Join Game</div>
+          <div class="label mb-8">Game PIN (from the big screen)</div>
+          <input
+            class="input input-lg"
+            id="pin-input"
+            placeholder="ABC123"
+            maxlength="6"
+            autocomplete="off" autocorrect="off"
+            autocapitalize="characters" spellcheck="false"
+            style="text-transform:uppercase"
+          >
+          <div id="pin-error" style="font-family:var(--font-ui);font-size:0.9rem;color:var(--danger);min-height:1.4em;margin-top:8px"></div>
+          <button class="btn btn-primary btn-full mt-16" id="connect-btn" onclick="PlayerGame.connectWithPin()">
+            Connect
+          </button>
+
+          <div id="connecting-status" class="text-center mt-16 hidden">
+            <div class="pulse-ring">⚡</div>
+            <div class="label mt-8">Connecting...</div>
+          </div>
+        </div>
+
+        <!-- Step 2: Name -->
+        <div id="step-name" class="hidden">
+          <div class="section-title text-center mb-16" style="font-size:1.6rem">Choose Your Name</div>
+          <div class="label mb-8">Display Name</div>
+          <input
+            class="input"
+            id="name-input"
+            placeholder="Storm Chaser"
+            maxlength="20"
+            autocomplete="off" autocorrect="off" spellcheck="false"
+            style="font-size:1.4rem;text-align:center"
+          >
+          <div id="name-error" style="font-family:var(--font-ui);font-size:0.9rem;color:var(--danger);min-height:1.4em;margin-top:8px"></div>
+          <div class="label text-muted mt-8" style="font-size:0.78rem">2 to 20 characters, classroom-appropriate</div>
+          <button class="btn btn-primary btn-full mt-16" onclick="PlayerGame.goToAvatarPicker()">
+            Next →
+          </button>
+        </div>
+
+        <!-- Step 3: Avatar -->
+        <div id="step-avatar" class="hidden">
+          <div class="section-title text-center mb-8" style="font-size:1.6rem">Pick Your Avatar</div>
+          <div id="avatar-selected-preview" style="font-size:4rem;text-align:center;margin:8px 0;line-height:1;animation:scoreBump 0.4s cubic-bezier(0.22,1,0.36,1)">🌪️</div>
+          <div id="avatar-grid" style="
+            display:grid;grid-template-columns:repeat(8,1fr);gap:6px;
+            margin:12px 0;
+          "></div>
+          <button class="btn btn-primary btn-full mt-8" onclick="PlayerGame.submitName()">
+            Join the Game!
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN: LOBBY -->
+  <div class="screen" id="pscreen-lobby">
+    <div class="flex-col gap-20 text-center" style="align-items:center">
+
+      <div class="section-title fade-in" style="color:var(--success)">You're In!</div>
+
+      <div class="card card-glow text-center" style="max-width:360px">
+        <div class="label mb-8">Playing as</div>
+        <div id="player-name-display"
+          style="font-family:var(--font-display);font-size:2.8rem;color:var(--accent-yellow);
+          text-shadow:0 0 20px rgba(255,215,0,0.4)"></div>
+        <div class="label mt-8">PIN: <span id="player-game-code" style="color:var(--primary)"></span></div>
+      </div>
+
+      <div class="waiting-tornado">🌪️</div>
+
+      <div class="card" style="max-width:360px;background:rgba(0,212,255,0.05);border-color:rgba(0,212,255,0.2)">
+        <div style="font-family:var(--font-ui);font-size:1.1rem;font-weight:600;line-height:1.5;text-align:center">
+          Waiting for your teacher to start...<br>
+          <span style="color:var(--text-muted);font-size:0.9rem">Keep this screen open!</span>
+        </div>
+      </div>
+
+      <div id="myth-preview" class="card hidden" style="max-width:380px;text-align:center">
+        <div class="label mb-8" style="color:var(--accent)">Today's Myth</div>
+        <div id="myth-preview-text"
+          style="font-family:var(--font-ui);font-size:1.1rem;font-weight:700;color:var(--text-bright);line-height:1.4"></div>
+        <div class="label mt-8" style="color:var(--success)">Get ready to bust it!</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SCREEN: TRANSITION (between questions) -->
+  <div class="screen" id="pscreen-transition">
+    <div class="flex-col gap-20 text-center" style="align-items:center">
+      <div class="player-transition-label">Get ready...</div>
+      <div class="player-transition-countdown" id="player-tr-countdown">3</div>
+      <div class="player-transition-qtext" id="player-tr-qtext">Next question coming up</div>
+    </div>
+  </div>
+
+  <!-- SCREEN: QUESTION -->
+  <div class="screen" id="pscreen-question">
+    <div class="flex-col gap-12 w-full" style="max-width:600px">
+
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div class="label">Score</div>
+          <div class="score-counter" id="player-score-display">0</div>
+        </div>
+        <div id="player-timer-number"
+          style="font-family:var(--font-display);font-size:3.2rem;font-weight:700;
+          color:var(--text-bright);text-align:center;min-width:48px">20</div>
+        <div style="text-align:right">
+          <div class="label">Rank</div>
+          <div id="player-rank-display"
+            style="font-family:var(--font-display);font-size:2rem;color:var(--accent-yellow)">  </div>
+        </div>
+      </div>
+
+      <div class="player-timer-bar">
+        <div class="player-timer-fill" id="player-timer-fill" style="width:100%"></div>
+      </div>
+
+      <div class="streak-display" id="player-streak-display"></div>
+
+      <div class="question-card">
+        <div id="player-q-type-badge"></div>
+        <div style="font-family:var(--font-ui);font-size:0.8rem;font-weight:600;
+          letter-spacing:0.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px">
+          Question <span id="player-q-num">1</span> of <span id="player-q-total">9</span>
+        </div>
+        <div class="question-text" id="player-question-text">Loading...</div>
+      </div>
+
+      <div class="answers-grid" id="player-answers-grid"></div>
+
+      <div class="answered-overlay hidden" id="answered-overlay">
+        <div id="answer-feedback-icon" style="font-size:5rem;margin-bottom:12px"></div>
+        <div id="answer-feedback-text" class="section-title" style="font-size:2rem;margin-bottom:8px"></div>
+        <div id="answer-points-text" style="font-family:var(--font-display);font-size:1.8rem;color:var(--success)"></div>
+        <div class="label mt-8 text-muted">Waiting for others...</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SCREEN: RESULTS -->
+  <div class="screen" id="pscreen-results">
+    <div class="flex-col gap-16 w-full" style="align-items:center;max-width:500px">
+
+      <div class="section-title text-center fade-in" id="player-result-title">Results</div>
+
+      <div class="card text-center card-glow">
+        <div id="player-result-emoji" style="font-size:4rem;margin-bottom:12px">🌪️</div>
+        <div id="player-result-msg" style="font-family:var(--font-ui);font-size:1.3rem;font-weight:700;margin-bottom:8px"></div>
+        <div class="score-counter" id="player-result-score">0</div>
+        <div id="player-result-streak" class="streak-display mt-8"></div>
+      </div>
+
+      <div class="card w-full">
+        <div class="label mb-12">Leaderboard</div>
+        <div class="leaderboard" id="player-lb"></div>
+      </div>
+
+      <div class="label text-muted">Waiting for next question...</div>
+    </div>
+  </div>
+
+  <!-- SCREEN: SCIENCE REVEAL -->
+  <div class="screen" id="pscreen-science">
+    <div class="flex-col gap-20 text-center w-full" style="align-items:center;max-width:500px">
+      <div class="section-title fade-in">Myth Busted!</div>
+      <div class="verdict-stamp verdict-myth" id="player-verdict-stamp">MYTH!</div>
+      <div class="card" style="text-align:left">
+        <div class="label mb-8">The Verdict</div>
+        <div class="explain-box">
+          Tornadoes <strong>CAN and DO</strong> cross water!
+          Waterspouts are real tornadoes over water. Water provides
+          <strong>virtually no resistance</strong> to a tornado vortex.
+          This myth is completely <strong>BUSTED!</strong>
+        </div>
+      </div>
+      <div class="label text-muted">Final results coming up...</div>
+    </div>
+  </div>
+
+  <!-- SCREEN: FINAL -->
+  <div class="screen" id="pscreen-final">
+    <div class="flex-col gap-20 text-center w-full" style="align-items:center;max-width:500px">
+
+      <div class="display-title fade-in">Game Over!</div>
+
+      <div class="card card-glow">
+        <div class="label mb-8">Your Results</div>
+        <div id="final-player-name"
+          style="font-family:var(--font-display);font-size:2.2rem;color:var(--accent-yellow);margin-bottom:8px"></div>
+        <div id="final-player-rank" class="rank-badge mb-12" style="margin:0 auto 12px"></div>
+        <div class="label mt-8">Final Score</div>
+        <div class="score-counter" id="final-score">0</div>
+        <div class="label mt-8">Accuracy</div>
+        <div id="final-accuracy"
+          style="font-family:var(--font-display);font-size:1.8rem;color:var(--success)">  %</div>
+        <div id="final-title" style="font-family:var(--font-ui);font-size:0.95rem;color:var(--text-muted);margin-top:8px"></div>
+      </div>
+
+      <div class="card w-full">
+        <div class="label mb-12">Final Leaderboard</div>
+        <div class="leaderboard" id="player-final-lb"></div>
+      </div>
+
+      <div style="font-size:3.5rem;animation:tornadoSpin 3s linear infinite">🌪️</div>
+      <div class="label text-muted">Thanks for playing StormLab!</div>
+
+    </div>
+  </div>
+
+  <!-- SCREEN: DISCONNECTED -->
+  <div class="screen" id="pscreen-disconnected">
+    <div class="flex-col gap-20 text-center" style="align-items:center">
+      <div style="font-size:4rem">⚡</div>
+      <div class="section-title" style="color:var(--danger)">Disconnected</div>
+      <div class="card" style="max-width:360px">
+        <div style="font-family:var(--font-body);font-size:1rem;line-height:1.7;color:var(--text-muted)">
+          You've been disconnected. This can happen if:<br><br>
+          The host ended the session<br>
+          You lost WiFi connection<br>
+          The browser tab was closed
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="location.reload()">Rejoin</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="fact-ticker">
+  <div class="fact-ticker-inner" id="fact-ticker-inner"></div>
+</div>
+
+<script>
+const PlayerGame = (() => {
+
+  let peer          = null;
+  let hostConn      = null;
+  let playerName    = '';
+  let playerAvatar  = '🌪️';
+  let gameCode      = '';
+  let myScore       = 0;
+  let myStreak      = 0;
+  let myTotalAnswered = 0;
+  let myTotalCorrect  = 0;
+  let currentTimer  = 0;
+  let timerMax      = 20;
+  let timerInterval = null;
+  let hasAnswered   = false;
+  let myLastAnswer  = null;
+
+  // Transition countdown state
+  let trInterval    = null;
+
+  function connectWithPin() {
+    const pinInput = document.getElementById('pin-input');
+    const code = pinInput.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    const errEl = document.getElementById('pin-error');
+
+    if (code.length < 4) {
+      errEl.textContent = 'Please enter the full Game PIN.';
+      pinInput.classList.add('shake');
+      setTimeout(() => pinInput.classList.remove('shake'), 500);
+      return;
+    }
+
+    errEl.textContent = '';
+    gameCode = code;
+
+    document.getElementById('connecting-status').classList.remove('hidden');
+    document.getElementById('connect-btn').disabled = true;
+
+    const playerId = `stormlab-PLAYER-${code}-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+
+    try {
+      peer = new Peer(playerId, {
+        host: '0.peerjs.com',
+        port: 443,
+        path: '/',
+        secure: true,
+      });
+    } catch(e) {
+      errEl.textContent = 'PeerJS failed. Make sure you are using a web server (not file://).';
+      resetConnectUI();
+      return;
+    }
+
+    peer.on('open', () => {
+      const hostPeerId = `stormlab-HOST-${code}`;
+      hostConn = peer.connect(hostPeerId, { reliable: true });
+
+      hostConn.on('open', () => {
+        document.getElementById('connecting-status').classList.add('hidden');
+        document.getElementById('step-pin').classList.add('hidden');
+        document.getElementById('step-name').classList.remove('hidden');
+        setTimeout(() => document.getElementById('name-input').focus(), 100);
+      });
+
+      hostConn.on('data', handleHostMessage);
+      hostConn.on('close', handleDisconnect);
+      hostConn.on('error', () => handleDisconnect());
+
+      setTimeout(() => {
+        if (!hostConn || !hostConn.open) {
+          document.getElementById('pin-error').textContent =
+            `Could not find game "${code}". Check the PIN and try again.`;
+          resetConnectUI();
+          if (peer) peer.destroy();
+        }
+      }, 8000);
+    });
+
+    peer.on('error', (err) => {
+      errEl.textContent = 'Connection failed. Check your PIN and WiFi.';
+      resetConnectUI();
+      console.error(err);
+    });
+  }
+
+  function resetConnectUI() {
+    document.getElementById('connecting-status').classList.add('hidden');
+    document.getElementById('connect-btn').disabled = false;
+  }
+
+  function goToAvatarPicker() {
+    const nameInput = document.getElementById('name-input');
+    const name = nameInput.value.trim();
+    const errEl = document.getElementById('name-error');
+
+    const v = validateName(name, []);
+    if (!v.valid) {
+      errEl.textContent = v.reason;
+      nameInput.classList.add('shake');
+      setTimeout(() => nameInput.classList.remove('shake'), 500);
+      return;
+    }
+    errEl.textContent = '';
+
+    // Build avatar grid
+    const grid = document.getElementById('avatar-grid');
+    grid.innerHTML = AVATARS.map((em, i) =>
+      `<button class="avatar-btn${i === 0 ? ' selected' : ''}" onclick="PlayerGame.selectAvatar('${em}', this)">${em}</button>`
+    ).join('');
+
+    document.getElementById('avatar-selected-preview').textContent = AVATARS[0];
+    playerAvatar = AVATARS[0];
+
+    document.getElementById('step-name').classList.add('hidden');
+    document.getElementById('step-avatar').classList.remove('hidden');
+  }
+
+  function selectAvatar(emoji, btn) {
+    playerAvatar = emoji;
+    document.querySelectorAll('.avatar-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    const preview = document.getElementById('avatar-selected-preview');
+    preview.textContent = emoji;
+    preview.style.animation = 'none';
+    void preview.offsetWidth;
+    preview.style.animation = '';
+  }
+
+  function submitName() {
+    const nameInput = document.getElementById('name-input');
+    const name = nameInput.value.trim();
+    const errEl = document.getElementById('name-error');
+
+    const v = validateName(name, []);
+    if (!v.valid) {
+      errEl.textContent = v.reason;
+      nameInput.classList.add('shake');
+      setTimeout(() => nameInput.classList.remove('shake'), 500);
+      return;
+    }
+
+    errEl.textContent = '';
+    playerName = name;
+    hostConn.send({ type: 'JOIN_REQUEST', payload: { name, avatar: playerAvatar } });
+  }
+
+  function handleHostMessage(data) {
+    const { type, payload } = data;
+
+    switch (type) {
+
+      case 'JOIN_ACCEPTED': {
+        document.getElementById('player-name-display').textContent = playerAvatar + ' ' + payload.name;
+        document.getElementById('player-game-code').textContent = payload.gameCode;
+        showScreen('pscreen-lobby');
+        AudioEngine.correct();
+        break;
+      }
+
+      case 'JOIN_REJECTED': {
+        showPlayerModal('No', 'Name Not Allowed', payload.reason || 'Please choose a different name.');
+        document.getElementById('name-input').value = '';
+        break;
+      }
+
+      case 'GAME_STARTING': {
+        const mythEl = document.getElementById('myth-preview');
+        const textEl = document.getElementById('myth-preview-text');
+        textEl.textContent = payload.mythText;
+        mythEl.classList.remove('hidden');
+        AudioEngine.suspense();
+        break;
+      }
+
+      case 'QUESTION_TRANSITION': {
+        // Show countdown transition between questions
+        const { nextIndex, countdown } = payload;
+        clearInterval(trInterval);
+
+        document.getElementById('player-tr-countdown').textContent = countdown;
+        document.getElementById('player-tr-qtext').textContent = 'Next question coming up...';
+
+        showScreen('pscreen-transition');
+
+        let t = countdown;
+        trInterval = setInterval(() => {
+          t--;
+          const el = document.getElementById('player-tr-countdown');
+          if (el) el.textContent = Math.max(1, t);
+          if (t <= 0) clearInterval(trInterval);
+        }, 1000);
+        break;
+      }
+
+      case 'QUESTION': {
+        clearInterval(trInterval);
+        const q = payload;
+        hasAnswered  = false;
+        myLastAnswer = null;
+        timerMax     = q.timer;
+        currentTimer = q.timer;
+
+        document.getElementById('player-q-num').textContent   = q.index + 1;
+        document.getElementById('player-q-total').textContent = q.totalQuestions;
+        document.getElementById('player-q-type-badge').innerHTML = getTypeBadge(q.type);
+        document.getElementById('player-question-text').textContent = q.question;
+
+        const grid = document.getElementById('player-answers-grid');
+        grid.innerHTML = q.answers.map((ans, i) => `
+          <button class="answer-btn" onclick="PlayerGame.submitAnswer(${i},this)" data-index="${i}">
+            <span class="shape-icon">${SHAPES[i] || '.'}</span>
+            <span>${escapeHTML(ans)}</span>
+          </button>
+        `).join('');
+        grid.classList.remove('hidden');
+
+        document.getElementById('player-timer-number').textContent = q.timer;
+        document.getElementById('player-timer-fill').style.width = '100%';
+        document.getElementById('player-timer-fill').classList.remove('danger');
+        document.getElementById('answered-overlay').classList.add('hidden');
+
+        showScreen('pscreen-question');
+        AudioEngine.questionStart();
+        startPlayerTimer(q.timer);
+        break;
+      }
+
+      case 'TIMER_UPDATE': {
+        const t = payload.timeRemaining;
+        currentTimer = t;
+        const pct = (t / timerMax) * 100;
+        document.getElementById('player-timer-number').textContent = t;
+        document.getElementById('player-timer-fill').style.width = pct + '%';
+        if (t <= 5) document.getElementById('player-timer-fill').classList.add('danger');
+        break;
+      }
+
+      case 'QUESTION_END': {
+        clearInterval(timerInterval);
+        if (!hasAnswered) {
+          const isPoll = payload.correctIndex === -1;
+          document.querySelectorAll('.answer-btn').forEach((btn, i) => {
+            if (!isPoll && i === payload.correctIndex) btn.classList.add('correct');
+            btn.disabled = true;
+          });
+          showAnswerFeedback(false, 0, false, isPoll);
+        }
+        break;
+      }
+
+      case 'ANSWER_RESULT': {
+        const { isCorrect, points, correctIndex, newScore, streak } = payload;
+        const isPoll = correctIndex === -1;
+        myScore  = newScore;
+        myStreak = streak;
+        if (isCorrect) myTotalCorrect++;
+
+        const scoreEl = document.getElementById('player-score-display');
+        scoreEl.textContent = formatNumber(newScore);
+        scoreEl.classList.remove('score-bump');
+        void scoreEl.offsetWidth;
+        scoreEl.classList.add('score-bump');
+
+        document.getElementById('player-streak-display').textContent =
+          streak > 1 ? `${streak}x streak!` : '';
+
+        document.querySelectorAll('#player-answers-grid .answer-btn').forEach((btn, i) => {
+          if (isPoll) {
+            // polls: just highlight the one they picked, no right/wrong
+            if (btn.classList.contains('selected')) btn.classList.add('poll-voted');
+          } else {
+            if (i === correctIndex)           btn.classList.add('correct');
+            else if (btn.classList.contains('selected')) btn.classList.add('wrong');
+          }
+          btn.disabled = true;
+        });
+
+        showAnswerFeedback(isCorrect, points, true, isPoll);
+        break;
+      }
+
+      case 'SHOW_RESULTS': {
+        const { leaderboard } = payload;
+        const myRank = leaderboard.findIndex(p => p.name === playerName) + 1;
+
+        document.getElementById('player-result-title').textContent =
+          myRank === 1 ? "You're #1!" : `You're #${myRank}!`;
+
+        document.getElementById('player-result-emoji').textContent =
+          myRank === 1 ? '🥇' : myRank === 2 ? '🥈' : myRank === 3 ? '🥉' : '🌪️';
+
+        document.getElementById('player-result-msg').textContent =
+          myRank <= 3 ? `Top ${myRank}, keep it up!` : 'Keep going!';
+
+        document.getElementById('player-result-score').textContent = formatNumber(myScore);
+
+        document.getElementById('player-result-streak').textContent =
+          myStreak > 1 ? `${myStreak} answer streak!` : '';
+
+        document.getElementById('player-lb').innerHTML =
+          leaderboard.slice(0, 8).map((p, i) => `
+            <div class="lb-entry" style="animation-delay:${i * 0.06}s;${p.name === playerName ? 'border-color:var(--primary);background:rgba(0,212,255,0.08)' : ''}">
+              <div class="lb-rank">${i + 1}</div>
+              <div class="lb-avatar" style="font-size:1.4rem;min-width:28px;text-align:center">${p.avatar || '🌪️'}</div>
+              <div class="lb-name" style="${p.name === playerName ? 'color:var(--primary)' : ''}">
+                ${escapeHTML(p.name)}
+              </div>
+              <div class="lb-score">${formatNumber(p.score)}</div>
+            </div>
+          `).join('');
+
+        showScreen('pscreen-results');
+        break;
+      }
+
+      case 'SCIENCE_REVEAL': {
+        document.getElementById('player-verdict-stamp').textContent = payload.verdict + '!';
+        showScreen('pscreen-science');
+        AudioEngine.reveal();
+        break;
+      }
+
+      case 'FINAL_LEADERBOARD':
+      case 'PODIUM': {
+        const lb = payload.leaderboard;
+        const myEntry = lb.find(p => p.name === playerName);
+        const myRank  = myEntry ? myEntry.rank : lb.length + 1;
+        const accuracy = myEntry && myEntry.totalAnswered > 0
+          ? Math.round((myEntry.totalCorrect / myEntry.totalAnswered) * 100) : 0;
+
+        document.getElementById('final-player-name').textContent = playerName;
+        document.getElementById('final-score').textContent = formatNumber(myScore);
+        document.getElementById('final-accuracy').textContent = accuracy + '%';
+        document.getElementById('final-player-rank').textContent = `Rank #${myRank}`;
+        document.getElementById('final-title').textContent = getRankTitle(myRank - 1);
+
+        document.getElementById('player-final-lb').innerHTML =
+          lb.slice(0, 10).map((p, i) => `
+            <div class="lb-entry" style="animation-delay:${i * 0.06}s;${p.name === playerName ? 'border-color:var(--primary);background:rgba(0,212,255,0.08)' : ''}">
+              <div class="lb-rank">${p.rank || i + 1}</div>
+              <div class="lb-avatar" style="font-size:1.4rem;min-width:28px;text-align:center">${p.avatar || '🌪️'}</div>
+              <div class="lb-name" style="${p.name === playerName ? 'color:var(--primary)' : ''}">
+                ${escapeHTML(p.name)}
+              </div>
+              <div class="lb-score">${formatNumber(p.score)}</div>
+            </div>
+          `).join('');
+
+        showScreen('pscreen-final');
+        if (myRank <= 3) { AudioEngine.winner(); FX.launchConfetti(60); }
+        else AudioEngine.applause();
+        break;
+      }
+
+      case 'GAME_ENDED': {
+        showScreen('pscreen-final');
+        break;
+      }
+
+      case 'RESET': {
+        myScore = myStreak = myTotalAnswered = myTotalCorrect = 0;
+        showScreen('pscreen-lobby');
+        break;
+      }
+
+      case 'PONG': break;
+    }
+  }
+
+  function submitAnswer(index, btn) {
+    if (hasAnswered) return;
+    hasAnswered  = true;
+    myLastAnswer = index;
+    myTotalAnswered++;
+
+    clearInterval(timerInterval);
+
+    document.querySelectorAll('#player-answers-grid .answer-btn').forEach(b => {
+      if (b === btn) b.classList.add('selected');
+      b.style.pointerEvents = 'none';
+    });
+
+    hostConn.send({ type: 'ANSWER', payload: { answerIndex: index, timeRemaining: currentTimer } });
+  }
+
+  function showAnswerFeedback(isCorrect, points, submitted, isPoll = false) {
+    const overlay = document.getElementById('answered-overlay');
+    document.getElementById('player-answers-grid').classList.add('hidden');
+
+    if (isPoll) {
+      document.getElementById('answer-feedback-icon').textContent = submitted ? '📊' : '⏰';
+      const textEl = document.getElementById('answer-feedback-text');
+      textEl.textContent = submitted ? 'Vote counted!' : "Time's Up!";
+      textEl.style.color = 'var(--primary)';
+      document.getElementById('answer-points-text').textContent = 'No points — this is a vote!';
+    } else {
+      document.getElementById('answer-feedback-icon').textContent =
+        !submitted ? '⏰' : isCorrect ? '✅' : '❌';
+
+      const textEl = document.getElementById('answer-feedback-text');
+      textEl.textContent = !submitted ? "Time's Up!" : isCorrect ? 'Correct!' : 'Wrong!';
+      textEl.style.color = isCorrect ? 'var(--success)' : 'var(--danger)';
+
+      document.getElementById('answer-points-text').textContent =
+        isCorrect && points > 0 ? `+${formatNumber(points)} pts` : '';
+
+      if (isCorrect) { AudioEngine.correct(); FX.flashScreen('rgba(0,255,136,0.15)'); }
+      else           { AudioEngine.wrong();   FX.flashScreen('rgba(255,23,68,0.12)'); }
+    }
+
+    overlay.classList.remove('hidden');
+  }
+
+  function startPlayerTimer(seconds) {
+    clearInterval(timerInterval);
+    const fill = document.getElementById('player-timer-fill');
+    const num  = document.getElementById('player-timer-number');
+    let t = seconds;
+
+    timerInterval = setInterval(() => {
+      t--;
+      fill.style.width = Math.max(0, (t / seconds) * 100) + '%';
+      num.textContent  = Math.max(0, t);
+      if (t <= 5) fill.classList.add('danger');
+      if (t <= 0) {
+        clearInterval(timerInterval);
+        if (!hasAnswered) showAnswerFeedback(false, 0, false);
+      }
+    }, 1000);
+  }
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+  }
+
+  function handleDisconnect() {
+    clearInterval(timerInterval);
+    showScreen('pscreen-disconnected');
+  }
+
+  return { connectWithPin, submitName, submitAnswer, goToAvatarPicker, selectAvatar };
+})();
+
+function escapeHTML(str) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(str));
+  return d.innerHTML;
+}
+function showPlayerModal(icon, title, body) {
+  document.getElementById('pm-icon').textContent  = icon;
+  document.getElementById('pm-title').textContent = title;
+  document.getElementById('pm-body').textContent  = body;
+  document.getElementById('player-modal').classList.remove('hidden');
+}
+function closePlayerModal() {
+  document.getElementById('player-modal').classList.add('hidden');
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  if (document.activeElement === document.getElementById('pin-input'))  PlayerGame.connectWithPin();
+  if (document.activeElement === document.getElementById('name-input')) PlayerGame.submitName();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  FX.initRain();
+  FX.startLightning();
+  initFactTicker();
+
+  const btn = document.getElementById('dark-toggle-btn');
+  btn && btn.addEventListener('click', () => {
+    document.body.classList.toggle('light-mode');
+    btn.textContent = document.body.classList.contains('light-mode') ? 'Day mode' : 'Night mode';
+  });
+
+  const urlPin = new URLSearchParams(window.location.search).get('pin');
+  if (urlPin) {
+    document.getElementById('pin-input').value = urlPin.toUpperCase();
+  }
+
+  setTimeout(() => document.getElementById('pin-input').focus(), 300);
+});
+</script>
+
+</body>
+</html>
